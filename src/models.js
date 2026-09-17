@@ -19,4 +19,6 @@ const NotebookSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+NotebookSchema.index({ updatedAt: -1 });
+
 export const Notebook = mongoose.model("Notebook", NotebookSchema);

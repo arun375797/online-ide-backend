@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import compression from "compression";
 import cors from "cors";
 import helmet from "helmet";
 import mongoose from "mongoose";
@@ -8,24 +9,23 @@ import { notebookRouter } from "./notebookRoutes.js";
 import { requireAuth } from "./middleware.js";
 
 const PORT = Number(process.env.PORT) || 5000;
-
-function allowedOrigins() {
-  const extra = (process.env.CLIENT_ORIGIN || "")
-    .split(",")
-    .map((s) => s.trim().replace(/\/+$/, ""))
-    .filter(Boolean);
-  return [
+const ORIGINS = new Set(
+  [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://myide.cc",
     "https://www.myide.cc",
-    ...extra,
-  ];
-}
+    ...(process.env.CLIENT_ORIGIN || "")
+      .split(",")
+      .map((s) => s.trim().replace(/\/+$/, ""))
+      .filter(Boolean),
+  ]
+);
 
 async function connectDb() {
+  const options = { maxPoolSize: 10, serverSelectionTimeoutMS: 5000 };
   if (process.env.MONGODB_URI) {
-    await mongoose.connect(process.env.MONGODB_URI);
+    await mongoose.connect(process.env.MONGODB_URI, options);
     console.log("MongoDB connected");
     return;
   }
@@ -34,17 +34,18 @@ async function connectDb() {
   }
   const { MongoMemoryServer } = await import("mongodb-memory-server");
   const memory = await MongoMemoryServer.create();
-  await mongoose.connect(memory.getUri());
+  await mongoose.connect(memory.getUri(), options);
   console.log("MongoDB memory server connected (local only)");
 }
 
 const app = express();
 app.set("trust proxy", 1);
+app.use(compression());
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(
   cors({
     origin(origin, cb) {
-      if (!origin || allowedOrigins().includes(origin)) return cb(null, true);
+      if (!origin || ORIGINS.has(origin)) return cb(null, true);
       return cb(new Error("Origin not allowed"));
     },
     credentials: true,
@@ -53,6 +54,7 @@ app.use(
 app.use(express.json({ limit: "2mb" }));
 
 app.get("/api/health", (_req, res) => {
+  res.set("Cache-Control", "no-store");
   res.json({ ok: true });
 });
 

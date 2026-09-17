@@ -4,8 +4,23 @@ import { Notebook } from "./models.js";
 export const notebookRouter = Router();
 
 notebookRouter.get("/", async (_req, res) => {
-  const rows = await Notebook.find().sort({ updatedAt: -1 }).lean();
+  const rows = await Notebook.aggregate([
+    { $sort: { updatedAt: -1 } },
+    {
+      $project: {
+        name: 1,
+        updatedAt: 1,
+        fileCount: { $size: { $ifNull: ["$files", []] } },
+      },
+    },
+  ]);
   res.json(rows);
+});
+
+notebookRouter.get("/:id", async (req, res) => {
+  const row = await Notebook.findById(req.params.id).lean();
+  if (!row) return res.status(404).json({ error: "Notebook not found." });
+  res.json(row);
 });
 
 notebookRouter.post("/", async (req, res) => {
@@ -29,7 +44,7 @@ notebookRouter.put("/:id", async (req, res) => {
       ...(Array.isArray(openFileIds) ? { openFileIds } : {}),
       ...(activeFileId === null || typeof activeFileId === "string" ? { activeFileId } : {}),
     },
-    { new: true, runValidators: true }
+    { new: true, runValidators: true, lean: true }
   );
   if (!row) return res.status(404).json({ error: "Notebook not found." });
   res.json(row);
