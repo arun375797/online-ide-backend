@@ -12,9 +12,15 @@ const PORT = Number(process.env.PORT) || 5000;
 function allowedOrigins() {
   const extra = (process.env.CLIENT_ORIGIN || "")
     .split(",")
-    .map((s) => s.trim())
+    .map((s) => s.trim().replace(/\/+$/, ""))
     .filter(Boolean);
-  return ["http://localhost:5173", "http://127.0.0.1:5173", ...extra];
+  return [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://myide.cc",
+    "https://www.myide.cc",
+    ...extra,
+  ];
 }
 
 async function connectDb() {
